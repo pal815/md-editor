@@ -71,6 +71,9 @@ export function highlightCodeBlocks(root: ParentNode): void {
     if (block.dataset.highlighted === "yes") continue;
 
     const lang = languageFromClass(block.className);
+    // Mermaid blocks are handled separately by renderMermaid — never syntax
+    // highlight them (they get replaced with a rendered SVG diagram).
+    if (lang === "mermaid") continue;
     try {
       if (lang && hljs.getLanguage(lang)) {
         const text = block.textContent ?? "";
@@ -179,8 +182,88 @@ export function linkifyBareUrls(root: Element): void {
   }
 }
 
-/** Run every post-render enhancement on the viewer root. */
-export function enhanceViewer(root: Element): void {
+/* ── Mermaid diagram rendering ─────────────────────────────────────────── */
+
+// mermaid is heavy (~hundreds of KB), so we import it lazily — only the first
+// time a viewer actually contains a ```mermaid block. The module is cached
+// across calls.
+type MermaidModule = typeof import("mermaid")["default"];
+let mermaidPromise: Promise<MermaidModule> | null = null;
+let mermaidThemeApplied: "dark" | "light" | null = null;
+
+async function getMermaid(theme: "dark" | "light"): Promise<MermaidModule> {
+  if (!mermaidPromise) {
+    mermaidPromise = import("mermaid").then((m) => m.default);
+  }
+  const mermaid = await mermaidPromise;
+  // (Re)initialize when the theme changes so diagrams match the UI theme.
+  if (mermaidThemeApplied !== theme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict", // sanitize labels, disable click handlers
+      theme: theme === "dark" ? "dark" : "default",
+      fontFamily: '"Segoe UI", Inter, sans-serif',
+    });
+    mermaidThemeApplied = theme;
+  }
+  return mermaid;
+}
+
+let mermaidSeq = 0;
+
+/**
+ * Replace every ```mermaid code block under `root` with a rendered SVG
+ * diagram. Parse errors leave the original code block untouched. Runs after
+ * DOMPurify; mermaid's own `securityLevel: 'strict'` keeps the generated SVG
+ * safe.
+ */
+export async function renderMermaid(
+  root: Element,
+  theme: "dark" | "light",
+): Promise<void> {
+  const blocks = Array.from(
+    root.querySelectorAll<HTMLElement>(
+      "pre code.language-mermaid, pre code.lang-mermaid",
+    ),
+  );
+  if (blocks.length === 0) return;
+
+  let mermaid: MermaidModule;
+  try {
+    mermaid = await getMermaid(theme);
+  } catch {
+    return; // mermaid failed to load — leave code blocks as-is
+  }
+
+  for (const block of blocks) {
+    const pre = block.closest("pre");
+    if (!pre) continue;
+    const source = block.textContent ?? "";
+    if (!source.trim()) continue;
+    try {
+      const id = `mmd-${Date.now()}-${mermaidSeq++}`;
+      const { svg } = await mermaid.render(id, source);
+      const wrap = document.createElement("div");
+      wrap.className = "mermaid-rendered";
+      wrap.innerHTML = svg;
+      pre.replaceWith(wrap);
+    } catch {
+      // Invalid diagram syntax — keep the source block visible so the user
+      // can fix it rather than silently dropping content.
+    }
+  }
+}
+
+/**
+ * Run every post-render enhancement on the viewer root. `theme` drives the
+ * mermaid diagram palette. Async because mermaid rendering is async; callers
+ * that don't care can ignore the promise.
+ */
+export async function enhanceViewer(
+  root: Element,
+  theme: "dark" | "light" = "dark",
+): Promise<void> {
   highlightCodeBlocks(root);
   linkifyBareUrls(root);
+  await renderMermaid(root, theme);
 }

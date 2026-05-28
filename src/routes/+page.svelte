@@ -21,7 +21,7 @@
     setEditorContent,
     getEditorContent,
   } from "$lib/editor";
-  import { initTheme } from "$lib/theme";
+  import { initTheme, getResolvedTheme } from "$lib/theme";
   import { settings } from "$lib/settings.svelte";
   import { renderMarkdownSafe } from "$lib/viewer";
   import { enhanceViewer } from "$lib/viewer-enhance";
@@ -434,7 +434,7 @@
     if (settings.viewMode !== "viewer" || !viewerEl) return;
     // Wait one microtask so {@html} has committed.
     queueMicrotask(() => {
-      if (viewerEl) enhanceViewer(viewerEl);
+      if (viewerEl) void enhanceViewer(viewerEl, getResolvedTheme());
     });
   });
 </script>

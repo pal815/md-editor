@@ -29,3 +29,6 @@ vite.config.ts.timestamp-*
 .codex-run-output.txt
 .build-output.txt
 *.log
+
+# ── Promo / marketing assets (kept out of the repo) ───────────────────
+/promo/

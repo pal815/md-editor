@@ -1,6 +1,6 @@
 [package]
 name = "md-editor"
-version = "0.1.7"
+version = "0.1.8"
 description = "A local-first markdown editor with live preview, tables, tabs, and light/dark themes"
 authors = ["pal815"]
 license = "MIT"
