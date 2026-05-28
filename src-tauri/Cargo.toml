@@ -1,0 +1,41 @@
+[package]
+name = "md-editor"
+version = "0.1.7"
+description = "A local-first markdown editor with live preview, tables, tabs, and light/dark themes"
+authors = ["pal815"]
+license = "MIT"
+repository = "https://github.com/pal815/md-editor"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "md_editor_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Default `tauri` (no `devtools` feature). DevTools is automatically available
+# in debug builds via `cfg(debug_assertions)`; in release builds we never want
+# DevTools compiled into the shipped binary.
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["sync"] }
+pulldown-cmark = "0.12"
+thiserror = "2"
+
+# Windows-only: per-user file-association registration via HKCU. The
+# `SHChangeNotify` shell call is declared inline (links shell32), so no extra
+# crate is needed for the change notification.
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
