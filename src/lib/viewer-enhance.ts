@@ -28,6 +28,12 @@ import bash from "highlight.js/lib/languages/bash";
 import shell from "highlight.js/lib/languages/shell";
 import plaintext from "highlight.js/lib/languages/plaintext";
 
+// KaTeX stylesheet (+ its bundled fonts) — small and always present so math
+// renders correctly the first time. The heavy KaTeX engine itself is loaded
+// lazily (see getKatex below). Vite copies the woff2 fonts to same-origin
+// assets, satisfying the strict `font-src 'self'` CSP.
+import "katex/dist/katex.min.css";
+
 hljs.registerLanguage("javascript", javascript);
 hljs.registerLanguage("typescript", typescript);
 hljs.registerLanguage("python", python);
@@ -62,6 +68,13 @@ hljs.configure({
 });
 
 /**
+ * Fenced-block languages that are RENDERED (mermaid → SVG, latex → math)
+ * rather than syntax-highlighted. We skip them here so their source text
+ * stays intact for renderMermaid / renderMath to consume.
+ */
+const RENDERED_LANGS = new Set(["mermaid", "latex", "tex", "math", "katex"]);
+
+/**
  * Apply syntax highlighting to every `<pre><code>` inside `root`.
  * Idempotent — already-highlighted blocks are skipped.
  */
@@ -71,9 +84,9 @@ export function highlightCodeBlocks(root: ParentNode): void {
     if (block.dataset.highlighted === "yes") continue;
 
     const lang = languageFromClass(block.className);
-    // Mermaid blocks are handled separately by renderMermaid — never syntax
-    // highlight them (they get replaced with a rendered SVG diagram).
-    if (lang === "mermaid") continue;
+    // Rendered languages (mermaid diagrams, LaTeX math) are handled by their
+    // own passes and must not be syntax-highlighted (they get replaced).
+    if (lang && RENDERED_LANGS.has(lang)) continue;
     try {
       if (lang && hljs.getLanguage(lang)) {
         const text = block.textContent ?? "";
@@ -254,10 +267,71 @@ export async function renderMermaid(
   }
 }
 
+/* ── LaTeX math rendering (KaTeX) ──────────────────────────────────────── */
+
+// KaTeX's engine is ~280 KB, so we import it lazily — only the first time a
+// viewer actually contains a math block. Cached across calls.
+type KatexModule = typeof import("katex")["default"];
+let katexPromise: Promise<KatexModule> | null = null;
+
+async function getKatex(): Promise<KatexModule> {
+  if (!katexPromise) {
+    katexPromise = import("katex").then((m) => m.default);
+  }
+  return katexPromise;
+}
+
+// Fenced languages we treat as display math.
+const MATH_SELECTOR = ["latex", "tex", "math", "katex"]
+  .flatMap((l) => [`pre code.language-${l}`, `pre code.lang-${l}`])
+  .join(", ");
+
+/**
+ * Replace every ```latex / ```math / ```tex / ```katex code block under
+ * `root` with KaTeX-rendered display math. Parse errors leave a styled error
+ * message in place (throwOnError:false) rather than dropping the content.
+ * Runs after DOMPurify; with `trust:false` KaTeX only ever emits safe markup
+ * from the (plain-text) source, so injecting its HTML is safe.
+ */
+export async function renderMath(root: Element): Promise<void> {
+  const blocks = Array.from(root.querySelectorAll<HTMLElement>(MATH_SELECTOR));
+  if (blocks.length === 0) return;
+
+  let katex: KatexModule;
+  try {
+    katex = await getKatex();
+  } catch {
+    return; // KaTeX failed to load — leave the code blocks as-is
+  }
+
+  for (const block of blocks) {
+    const pre = block.closest("pre");
+    if (!pre) continue;
+    const source = block.textContent ?? "";
+    if (!source.trim()) continue;
+    try {
+      const html = katex.renderToString(source, {
+        displayMode: true,
+        throwOnError: false,
+        errorColor: "#e06c75",
+        trust: false,
+        strict: false,
+        output: "htmlAndMathml",
+      });
+      const wrap = document.createElement("div");
+      wrap.className = "katex-rendered";
+      wrap.innerHTML = html;
+      pre.replaceWith(wrap);
+    } catch {
+      // Unexpected failure — keep the source block visible so nothing is lost.
+    }
+  }
+}
+
 /**
  * Run every post-render enhancement on the viewer root. `theme` drives the
- * mermaid diagram palette. Async because mermaid rendering is async; callers
- * that don't care can ignore the promise.
+ * mermaid diagram palette. Async because mermaid/KaTeX rendering is async;
+ * callers that don't care can ignore the promise.
  */
 export async function enhanceViewer(
   root: Element,
@@ -265,5 +339,5 @@ export async function enhanceViewer(
 ): Promise<void> {
   highlightCodeBlocks(root);
   linkifyBareUrls(root);
-  await renderMermaid(root, theme);
+  await Promise.all([renderMermaid(root, theme), renderMath(root)]);
 }

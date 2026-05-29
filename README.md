@@ -37,6 +37,9 @@ right-click menu or with familiar shortcuts (<kbd>Ctrl</kbd>+<kbd>B</kbd>,
   choice is remembered.
 - **Code-fence highlighting** — JavaScript, TypeScript, Python, SQL, JSON,
   HTML, CSS, Rust, YAML, Markdown, and more.
+- **Math & diagrams (Viewer)** — fenced ` ```latex ` (or ` ```math `) blocks
+  render as LaTeX via [KaTeX](https://katex.org/), and ` ```mermaid ` blocks
+  render as diagrams.
 
 ## Keyboard shortcuts
 
@@ -47,6 +50,7 @@ right-click menu or with familiar shortcuts (<kbd>Ctrl</kbd>+<kbd>B</kbd>,
 | <kbd>Ctrl</kbd>+<kbd>T</kbd> / <kbd>W</kbd> | New tab / Close tab |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> | Switch tabs |
 | <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>`</kbd> | Bold / Italic / Inline code |
+| <kbd>Ctrl</kbd>+<kbd>K</kbd> | Insert link |
 | <kbd>Ctrl</kbd>+<kbd>E</kbd> | Toggle Edit / Viewer |
 | <kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | Zoom in / out / reset |
 | <kbd>Enter</kbd> (in a table cell) | In-cell line break (`<br>`) |
@@ -184,6 +188,9 @@ Tauri 2, SvelteKit, CodeMirror 6로 만든 **로컬 우선(local-first) 데스�
   기억됩니다.
 - **코드 펜스 구문 강조** — JavaScript, TypeScript, Python, SQL, JSON, HTML,
   CSS, Rust, YAML, Markdown 등.
+- **수식 & 다이어그램 (뷰어)** — ` ```latex ` (또는 ` ```math `) 코드 블록은
+  [KaTeX](https://katex.org/)로 LaTeX 수식으로, ` ```mermaid ` 블록은
+  다이어그램으로 렌더링됩니다.
 
 ## 단축키
 
@@ -194,6 +201,7 @@ Tauri 2, SvelteKit, CodeMirror 6로 만든 **로컬 우선(local-first) 데스�
 | <kbd>Ctrl</kbd>+<kbd>T</kbd> / <kbd>W</kbd> | 새 탭 / 탭 닫기 |
 | <kbd>Ctrl</kbd>+<kbd>Tab</kbd>, <kbd>Ctrl</kbd>+<kbd>1</kbd>…<kbd>9</kbd> | 탭 전환 |
 | <kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>`</kbd> | 굵게 / 기울임 / 인라인 코드 |
+| <kbd>Ctrl</kbd>+<kbd>K</kbd> | 링크 삽입 |
 | <kbd>Ctrl</kbd>+<kbd>E</kbd> | 편집 / 뷰어 전환 |
 | <kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>-</kbd> / <kbd>0</kbd> | 확대 / 축소 / 원래대로 |
 | <kbd>Enter</kbd> (표 셀 안) | 셀 내 줄바꿈 (`<br>`) |

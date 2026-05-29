@@ -38,6 +38,7 @@ interface SettingsShape {
   theme?: string;
   allowExternalImages?: boolean;
   viewMode?: string;
+  showLineNumbers?: boolean;
 }
 
 /* ── Public API ─────────────────────────────────────────────────────── */

@@ -8,6 +8,9 @@
     refreshRecentFiles,
     closeTab,
     newFile,
+    openFile,
+    saveFile,
+    saveFileAs,
     saveSession,
     loadSession,
     attachDragDropHandler,
@@ -20,6 +23,7 @@
     destroyMarkdownEditor,
     setEditorContent,
     getEditorContent,
+    setLineNumbers,
   } from "$lib/editor";
   import { initTheme, getResolvedTheme } from "$lib/theme";
   import { settings } from "$lib/settings.svelte";
@@ -95,6 +99,7 @@
       { label: "CSS", lang: "css" },
       { label: "Rust", lang: "rust" },
       { label: "YAML", lang: "yaml" },
+      { label: "LaTeX (math)", lang: "latex" },
     ];
 
     const tableInfo = getTableInfo(view);
@@ -258,52 +263,80 @@
   });
 
   function onWindowKeyDown(e: KeyboardEvent) {
-    // Tab management shortcuts (Ctrl+T / Ctrl+W / Ctrl+Tab / Ctrl+1..9).
-    if (e.ctrlKey || e.metaKey) {
-      if (e.key === "t" && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        newFile();
-        return;
-      }
-      if (e.key === "w" && !e.shiftKey && !e.altKey) {
-        e.preventDefault();
-        closeTab(app.activeId);
-        return;
-      }
-      if (e.key === "Tab") {
-        e.preventDefault();
-        app.cycleTab(e.shiftKey ? -1 : 1);
-        return;
-      }
-      if (!e.shiftKey && !e.altKey && /^[1-9]$/.test(e.key)) {
-        const idx = parseInt(e.key, 10) - 1;
-        if (idx < app.buffers.length) {
-          e.preventDefault();
-          app.switchTo(app.buffers[idx].id);
-        }
-        return;
-      }
-    }
-    // Zoom shortcuts.
-    if (!(e.ctrlKey || e.metaKey)) return;
-    if (e.shiftKey || e.altKey) return;
-    if (e.key === "e" || e.key === "E") {
-      // Ctrl+E: toggle Edit ↔ Viewer (matches the native menu accelerator;
-      // we intercept here too so it works even when the editor has focus and
-      // would otherwise consume the keystroke).
+    // Everything here is a Ctrl/Cmd combo. Bail early otherwise so we never
+    // swallow plain typing.
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod || e.altKey) return;
+
+    // Ctrl+Tab / Ctrl+Shift+Tab → cycle tabs (Shift cycles backwards).
+    if (e.key === "Tab") {
       e.preventDefault();
-      void settings.toggleViewMode();
+      app.cycleTab(e.shiftKey ? -1 : 1);
       return;
     }
+
+    // Zoom (allow Shift so Ctrl++ works on layouts where `+` needs Shift).
     if (e.key === "=" || e.key === "+") {
       e.preventDefault();
       fontSize = Math.min(FONT_MAX, fontSize + 1);
-    } else if (e.key === "-") {
+      return;
+    }
+    if (e.key === "-" || e.key === "_") {
       e.preventDefault();
       fontSize = Math.max(FONT_MIN, fontSize - 1);
-    } else if (e.key === "0") {
+      return;
+    }
+    if (e.key === "0") {
       e.preventDefault();
       fontSize = FONT_DEFAULT;
+      return;
+    }
+
+    // Ctrl+Shift+S → Save As. (No other Shift combos are ours.)
+    if (e.shiftKey) {
+      if (e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        void saveFileAs();
+      }
+      return;
+    }
+
+    // Ctrl+1..9 → switch to the Nth tab.
+    if (/^[1-9]$/.test(e.key)) {
+      const idx = parseInt(e.key, 10) - 1;
+      if (idx < app.buffers.length) {
+        e.preventDefault();
+        app.switchTo(app.buffers[idx].id);
+      }
+      return;
+    }
+
+    // Plain Ctrl/Cmd letter combos. NOTE: these are ALSO declared as native
+    // menu accelerators, but WebView2 swallows the keystroke before the
+    // native menu sees it whenever the editor has focus — so we handle them
+    // here too, which is the only way they fire while the user is typing.
+    switch (e.key.toLowerCase()) {
+      case "n": // New document …
+      case "t": // … and New tab are the same action (a fresh empty buffer).
+        e.preventDefault();
+        void newFile();
+        break;
+      case "o": // Open…
+        e.preventDefault();
+        void openFile();
+        break;
+      case "s": // Save
+        e.preventDefault();
+        void saveFile();
+        break;
+      case "w": // Close tab
+        e.preventDefault();
+        closeTab(app.activeId);
+        break;
+      case "e": // Toggle Edit ↔ Viewer
+        e.preventDefault();
+        void settings.toggleViewMode();
+        break;
     }
   }
 
@@ -323,7 +356,15 @@
       // straight into the last-known state.
       await loadSession();
       await refreshRecentFiles();
-      menuUnlisten = await attachMenuHandler();
+      // Apply the persisted line-numbers preference to the (already-created)
+      // editor now that settings have loaded.
+      if (editor) setLineNumbers(editor, settings.showLineNumbers);
+      menuUnlisten = await attachMenuHandler(() => {
+        void (async () => {
+          await settings.toggleShowLineNumbers();
+          if (editor) setLineNumbers(editor, settings.showLineNumbers);
+        })();
+      });
       dragDropUnlisten = await attachDragDropHandler();
       // Open any files passed via Windows file association at first launch
       // (subsequent launches reuse this instance and arrive as `files-dropped`
@@ -1062,6 +1103,19 @@
   }
   .viewer-area :global(li input[type="checkbox"]) {
     margin-right: 0.4em;
+  }
+
+  /* Rendered LaTeX (KaTeX) — allow wide equations to scroll instead of
+     overflowing the pane. KaTeX colours inherit currentColor (--fg-app). */
+  .viewer-area :global(.katex-rendered) {
+    margin: 1em 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  /* Rendered mermaid diagram wrapper. */
+  .viewer-area :global(.mermaid-rendered) {
+    margin: 1em 0;
+    overflow-x: auto;
   }
 
   /* ── Status bar ─────────────────────────────────────────────────────── */

@@ -1,4 +1,4 @@
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment } from "@codemirror/state";
 import {
   EditorView,
   keymap,
@@ -35,7 +35,7 @@ import {
   ctrlEnterExitTable,
   pipeColumnSync,
 } from "./table-autocomplete";
-import { wrapInline } from "./transforms";
+import { wrapInline, insertLink } from "./transforms";
 
 // Language packages for nested code-block highlighting.
 import { python } from "@codemirror/lang-python";
@@ -123,6 +123,19 @@ const codeLanguages: LanguageDescription[] = [
   }),
 ];
 
+/**
+ * Holds the line-numbers gutter so it can be toggled at runtime (View →
+ * Toggle Line Numbers) without rebuilding the editor state.
+ */
+const lineNumbersCompartment = new Compartment();
+
+/** Show or hide the line-numbers gutter on a live editor. */
+export function setLineNumbers(view: EditorView, show: boolean): void {
+  view.dispatch({
+    effects: lineNumbersCompartment.reconfigure(show ? lineNumbers() : []),
+  });
+}
+
 export interface EditorCallbacks {
   /** Fired whenever the document text changes. */
   onContentChange?: (content: string) => void;
@@ -137,6 +150,8 @@ export interface EditorCallbacks {
 export interface CreateEditorOptions extends EditorCallbacks {
   parent: HTMLElement;
   initialContent?: string;
+  /** Whether the line-numbers gutter starts visible. Defaults to true. */
+  showLineNumbers?: boolean;
 }
 
 /**
@@ -162,7 +177,9 @@ export function createMarkdownEditor(opts: CreateEditorOptions): EditorView {
   const state = EditorState.create({
     doc: opts.initialContent ?? "",
     extensions: [
-      lineNumbers(),
+      lineNumbersCompartment.of(
+        opts.showLineNumbers === false ? [] : lineNumbers(),
+      ),
       highlightActiveLine(),
       highlightActiveLineGutter(),
       history(),
@@ -220,6 +237,16 @@ export function createMarkdownEditor(opts: CreateEditorOptions): EditorView {
           key: "Mod-`",
           run: (view) => {
             wrapInline(view, "`", "code");
+            return true;
+          },
+        },
+        {
+          // Ctrl+K / Cmd+K: insert a markdown link. If text is selected it
+          // becomes the link label; otherwise a "link text" placeholder is
+          // selected for quick typing.
+          key: "Mod-k",
+          run: (view) => {
+            insertLink(view);
             return true;
           },
         },

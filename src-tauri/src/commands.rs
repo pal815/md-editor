@@ -562,7 +562,7 @@ pub fn render_markdown(source: String) -> String {
 /// User-level preferences that survive across sessions. Kept tiny and string-y
 /// so we don't end up with a sprawling schema; everything here is purely
 /// cosmetic / behavioural (no paths, no secrets).
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     /// "light" | "dark" | "system". Anything else is treated as "system".
@@ -573,6 +573,28 @@ pub struct Settings {
     /// Last view mode used (per-app, not per-tab).
     /// "edit" | "viewer". Defaults to "edit".
     pub view_mode: String,
+    /// Whether the editor's line-numbers gutter is shown. On by default;
+    /// configs written before this field existed are treated as `true`.
+    #[serde(default = "default_true")]
+    pub show_line_numbers: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+// Manual `Default` (instead of deriving) so a missing settings file — or any
+// field absent from an older config — yields the same sensible defaults that
+// `#[serde(default)]` uses to fill gaps, including `show_line_numbers: true`.
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            theme: String::new(),
+            allow_external_images: false,
+            view_mode: String::new(),
+            show_line_numbers: true,
+        }
+    }
 }
 
 fn settings_path(app: &AppHandle) -> Result<PathBuf, String> {

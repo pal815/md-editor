@@ -15,6 +15,7 @@ interface SettingsShape {
   theme?: string;
   allowExternalImages?: boolean;
   viewMode?: string;
+  showLineNumbers?: boolean;
 }
 
 class Settings {
@@ -22,6 +23,8 @@ class Settings {
   viewMode = $state<ViewMode>("edit");
   /** Whether to let the Viewer load external https images. Default off. */
   allowExternalImages = $state<boolean>(false);
+  /** Whether the editor's line-numbers gutter is visible. Default on. */
+  showLineNumbers = $state<boolean>(true);
   /** True once `init()` has finished reading from disk. */
   loaded = $state<boolean>(false);
 
@@ -30,6 +33,8 @@ class Settings {
       const s = await invoke<SettingsShape>("load_settings");
       this.viewMode = s?.viewMode === "viewer" ? "viewer" : "edit";
       this.allowExternalImages = !!s?.allowExternalImages;
+      // Absent (older configs) or anything but an explicit `false` → on.
+      this.showLineNumbers = s?.showLineNumbers !== false;
     } catch {
       // first run / backend not ready — keep defaults
     } finally {
@@ -53,6 +58,15 @@ class Settings {
 
   async toggleAllowExternalImages(): Promise<void> {
     await this.setAllowExternalImages(!this.allowExternalImages);
+  }
+
+  async setShowLineNumbers(show: boolean): Promise<void> {
+    this.showLineNumbers = show;
+    await this.persist({ showLineNumbers: show });
+  }
+
+  async toggleShowLineNumbers(): Promise<void> {
+    await this.setShowLineNumbers(!this.showLineNumbers);
   }
 
   /**
